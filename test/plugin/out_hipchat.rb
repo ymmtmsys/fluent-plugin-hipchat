@@ -52,7 +52,7 @@ class HipchatOutputTest < Test::Unit::TestCase
 
   def test_message
     d = create_driver
-    stub(d.instance.hipchat).rooms_message('testroom', 'testuser', 'foo', 0, 'red', 'html')
+    stub(d.instance.hipchat['testroom']).send('testuser', 'foo', :notify => false, :color => 'red', :message_format => 'html')
     assert_equal d.instance.hipchat.instance_variable_get(:@token), 'testtoken'
     d.emit({'message' => 'foo', 'color' => 'red'})
     d.run
@@ -60,7 +60,7 @@ class HipchatOutputTest < Test::Unit::TestCase
 
   def test_message_override
     d = create_driver
-    stub(d.instance.hipchat).rooms_message('my', 'alice', 'aaa', 1, 'random', 'text')
+    stub(d.instance.hipchat['my']).send('alice', 'aaa', :notify => true, :color => 'random', :message_format => 'text')
     d.emit(
       {
         'room' => 'my',
@@ -76,43 +76,43 @@ class HipchatOutputTest < Test::Unit::TestCase
 
   def test_topic
     d = create_driver
-    stub(d.instance.hipchat).rooms_topic('testroom', 'foo', 'testuser')
+    stub(d.instance.hipchat['testroom']).topic('foo', :from => 'testuser')
     d.emit({'topic' => 'foo'})
     d.run
   end
 
   def test_set_topic_response_error
     d = create_driver
-    stub(d.instance.hipchat).rooms_topic('testroom', 'foo', 'testuser') {
-      {'error' => { 'code' => 400, 'type' => 'Bad Request', 'message' => 'Topic body must be between 1 and 250 characters.' } }
+    stub.instance_of(HipChat::Room).topic('foo', :from => 'testuser') {
+      raise HipChat::UnknownResponseCode, "Unexpected 400 for room `testroom`"
     }
-    stub($log).error("HipChat Error:", :error_class => StandardError, :error => 'Topic body must be between 1 and 250 characters.')
+    stub($log).error("HipChat Error:", :error_class => HipChat::UnknownResponseCode, :error => "Unexpected 400 for room `testroom`")
     d.emit({'topic' => 'foo'})
     d.run
   end
 
   def test_send_message_response_error
     d = create_driver
-    stub(d.instance.hipchat).rooms_message('testroom', '<abc>', 'foo', 0, 'yellow', 'html') {
-      {'error' => { 'code' => 400, 'type' => 'Bad Request', 'message' => 'From name may not contain HTML.' } }
+    stub.instance_of(HipChat::Room).send('<abc>', 'foo', :notify => false, :color => 'yellow', :message_format => 'html') {
+      raise HipChat::UnknownResponseCode, "Unexpected 400 for room `testroom`"
     }
-    stub($log).error("HipChat Error:", :error_class => StandardError, :error => 'From name may not contain HTML.')
+    stub($log).error("HipChat Error:", :error_class => HipChat::UnknownResponseCode, :error => "Unexpected 400 for room `testroom`")
     d.emit({'from' => '<abc>', 'message' => 'foo'})
     d.run
   end
 
   def test_color_validate
     d = create_driver
-    stub(d.instance.hipchat).rooms_message('testroom', 'testuser', 'foo', 0, 'yellow', 'html')
+    stub(d.instance.hipchat['testroom']).send('testuser', 'foo', :notify => 0, :color => 'yellow', :message_format => 'html')
     d.emit({'message' => 'foo', 'color' => 'invalid'})
     d.run
   end
 
   def test_http_proxy
     create_driver(CONFIG + CONFIG_FOR_PROXY)
-    assert_equal 'localhost', HipChat::API.default_options[:http_proxyaddr]
-    assert_equal '8080', HipChat::API.default_options[:http_proxyport]
-    assert_equal 'user', HipChat::API.default_options[:http_proxyuser]
-    assert_equal 'password', HipChat::API.default_options[:http_proxypass]
+    assert_equal 'localhost', HipChat::Client.default_options[:http_proxyaddr]
+    assert_equal 8080, HipChat::Client.default_options[:http_proxyport]
+    assert_equal 'user', HipChat::Client.default_options[:http_proxyuser]
+    assert_equal 'password', HipChat::Client.default_options[:http_proxypass]
   end
 end

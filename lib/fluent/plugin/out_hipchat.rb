@@ -1,4 +1,3 @@
-
 module Fluent
   class HipchatOutput < BufferedOutput
     COLORS = %w(yellow red green purple gray random)
@@ -23,26 +22,28 @@ module Fluent
 
     def initialize
       super
-      require 'hipchat-api'
+      require 'hipchat'
     end
 
     def configure(conf)
       super
 
-      @hipchat = HipChat::API.new(conf['api_token'])
       @default_room = conf['default_room']
       @default_from = conf['default_from'] || 'fluentd'
       @default_notify = conf['default_notify'] || 0
       @default_color = conf['default_color'] || 'yellow'
       @default_format = conf['default_format'] || 'html'
       @default_timeout = conf['default_timeout']
-      if conf['http_proxy_host']
-        HipChat::API.http_proxy(
-          conf['http_proxy_host'],
-          conf['http_proxy_port'],
-          conf['http_proxy_user'],
-          conf['http_proxy_pass'])
-      end
+      
+      proxy_uri = if conf['http_proxy_host']
+                    "http://#{conf['http_proxy_user']}:#{conf['http_proxy_pass']}@#{conf['http_proxy_host']}:#{conf['http_proxy_port']}"
+                  else
+                    nil
+                  end
+
+      opts = {}
+      opts[:http_proxy] = proxy_uri if proxy_uri
+      @hipchat = HipChat::Client.new(conf['api_token'], opts)
     end
 
     def format(tag, time, record)
@@ -71,17 +72,15 @@ module Fluent
       end
       color = COLORS.include?(record['color']) ? record['color'] : @default_color
       message_format = FORMAT.include?(record['format']) ? record['format'] : @default_format
-      @hipchat.set_timeout(@default_timeout.to_i) unless @default_timeout.nil?
-      response = @hipchat.rooms_message(room, from, message, notify, color, message_format)
-      raise StandardError, response['error'][@key_name].to_s if defined?(response['error'][@key_name])
+      @hipchat.class.default_timeout(@default_timeout.to_i) unless @default_timeout.nil?
+      @hipchat[room].send(from, message, :notify => (notify == 1), :color => color, :message_format => message_format)
     end
 
     def set_topic(record)
       room = record['room'] || @default_room
       from = record['from'] || @default_from
       topic = record['topic']
-      response = @hipchat.rooms_topic(room, topic, from)
-      raise StandardError, response['error'][@key_name].to_s if defined?(response['error'][@key_name])
+      @hipchat[room].topic(topic, :from => from)
     end
   end
 end
