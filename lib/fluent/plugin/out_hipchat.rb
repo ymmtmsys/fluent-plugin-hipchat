@@ -5,6 +5,7 @@ module Fluent
     Fluent::Plugin.register_output('hipchat', self)
 
     config_param :api_token, :string
+    config_param :api_version, :string, :default => 'v1'
     config_param :default_room, :string, :default => nil
     config_param :default_color, :string, :default => nil
     config_param :default_from, :string, :default => nil
@@ -34,7 +35,7 @@ module Fluent
       @default_color = conf['default_color'] || 'yellow'
       @default_format = conf['default_format'] || 'html'
       @default_timeout = conf['default_timeout']
-      
+
       proxy_uri = if conf['http_proxy_host']
                     "http://#{conf['http_proxy_user']}:#{conf['http_proxy_pass']}@#{conf['http_proxy_host']}:#{conf['http_proxy_port']}"
                   else
@@ -43,6 +44,7 @@ module Fluent
 
       opts = {}
       opts[:http_proxy] = proxy_uri if proxy_uri
+      opts[:api_version] = conf['api_version']
       @hipchat = HipChat::Client.new(conf['api_token'], opts)
     end
 
