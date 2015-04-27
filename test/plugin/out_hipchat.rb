@@ -10,6 +10,7 @@ class HipchatOutputTest < Test::Unit::TestCase
   CONFIG = %[
     type hipchat
     api_token testtoken
+    api_version v1
     default_room testroom
     default_from testuser
     default_color yellow
@@ -114,5 +115,10 @@ class HipchatOutputTest < Test::Unit::TestCase
     assert_equal 8080, HipChat::Client.default_options[:http_proxyport]
     assert_equal 'user', HipChat::Client.default_options[:http_proxyuser]
     assert_equal 'password', HipChat::Client.default_options[:http_proxypass]
+  end
+
+  def test_api_version
+    create_driver(CONFIG + CONFIG_FOR_PROXY)
+    assert_equal 'https://api.hipchat.com/v1', HipChat::Client.base_uri
   end
 end
